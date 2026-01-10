@@ -1,0 +1,824 @@
+# Noeta DSL Compiler - Cursor Rules
+
+## Project Overview
+
+Noeta is a production-ready Domain-Specific Language (DSL) for data analysis that compiles to Python/Pandas code. The project follows a classic compiler architecture with clean separation of concerns.
+
+**Status**: Production Ready (67% coverage, 167/250 operations)
+**Core Implementation**: ~9,094 lines across 7 core modules
+**Documentation**: ~10,400 lines across 14 files
+
+## Architecture Principles
+
+### Compiler Pipeline
+The compilation process follows this strict sequence:
+```
+Source Code → Lexer → Tokens → Parser → AST → Semantic Analyzer → Code Generator → Python Code
+```
+
+**CRITICAL**: Each stage must be fully independent. No stage should skip ahead or reach back into previous stages.
+
+### Core Modules (All Required for New Operations)
+
+1. **noeta_lexer.py** (916 lines) - Tokenization
+2. **noeta_ast.py** (1,186 lines) - AST node definitions
+3. **noeta_parser.py** (3,480 lines) - Syntax analysis
+4. **noeta_semantic.py** (1,717 lines) - Semantic validation ⭐
+5. **noeta_codegen.py** (1,795 lines) - Code generation
+6. **noeta_errors.py** (~200 lines) - Error handling
+7. **noeta_runner.py** (~100 lines) - CLI orchestration
+
+### Design Patterns
+
+- **Visitor Pattern**: Code generator and semantic analyzer traverse AST
+- **Symbol Table Pattern**: Track dataset aliases and schemas across compilation
+- **Dataclass Pattern**: All AST nodes use `@dataclass` for clean structure
+- **Recursive Descent**: Parser implements top-down parsing
+- **Error Recovery**: Collect multiple errors before failing (multi-error reporting)
+
+## Coding Standards
+
+### Naming Conventions
+
+#### AST Node Names
+```python
+# ALWAYS use these exact field names in AST nodes:
+@dataclass
+class OperationNode(ASTNode):
+    source_alias: str      # NOT 'source' - input dataset alias
+    new_alias: str         # NOT 'alias' - output dataset alias
+    # For two-input operations:
+    alias1: str            # First input (e.g., JoinNode)
+    alias2: str            # Second input (e.g., JoinNode)
+    # For merge operations:
+    left_alias: str        # Left dataset
+    right_alias: str       # Right dataset
+```
+
+**NEVER use**: `source`, `alias`, `df`, `dataframe` as field names.
+
+#### Token Types
+```python
+# Format: ALL_CAPS with descriptive names
+class TokenType(Enum):
+    OPERATION_NAME = "OPERATION_NAME"  # e.g., FILTER, SELECT, GROUPBY
+```
+
+#### Parser Methods
+```python
+# Format: parse_<operation_name>
+def parse_filter(self):
+    """Parse: filter <source> condition=<expr> as <alias>"""
+    pass
+```
+
+#### Code Generator Visitors
+```python
+# Format: visit_<NodeType>
+def visit_FilterNode(self, node):
+    """Generate Pandas code for filter operation."""
+    pass
+```
+
+#### Semantic Validators
+```python
+# Format: visit_<NodeType> (same as codegen)
+def visit_FilterNode(self, node):
+    """Validate filter operation semantics."""
+    pass
+```
+
+### File Organization
+
+#### Module Size Limits
+- **Parser**: Can exceed 3,000 lines (complex grammar)
+- **Code Generator**: Can exceed 1,500 lines (many visitors)
+- **Other modules**: Aim for < 1,000 lines
+- **Test files**: Split by category (lexer, parser, semantic, codegen, integration)
+
+#### Folder Structure
+```
+noeta/
+├── noeta_lexer.py          # Core compiler modules
+├── noeta_parser.py
+├── noeta_ast.py
+├── noeta_semantic.py
+├── noeta_codegen.py
+├── noeta_errors.py
+├── noeta_runner.py         # Execution interfaces
+├── noeta_kernel.py
+├── examples/               # Test scripts (20+ files)
+├── tests/                  # Unit tests (pytest)
+│   ├── test_lexer.py
+│   ├── test_parser.py
+│   ├── test_semantic.py
+│   ├── test_codegen.py
+│   └── test_integration.py
+├── data/                   # Test datasets
+└── docs/                   # Documentation
+    └── archive/            # Historical docs
+```
+
+### Code Style
+
+#### Imports
+```python
+# Standard library first
+import sys
+from typing import List, Dict, Optional, Any
+from enum import Enum
+from dataclasses import dataclass
+
+# Third-party
+import pandas as pd
+import numpy as np
+
+# Local modules
+from noeta_ast import ASTNode, FilterNode
+from noeta_errors import NoetaError, ErrorCategory
+```
+
+#### Type Annotations
+```python
+# ALWAYS use type hints
+def parse_value(self) -> Any:
+    """Parse literal value from tokens."""
+    pass
+
+def visit_FilterNode(self, node: FilterNode) -> None:
+    """Validate filter operation."""
+    pass
+
+# Use Optional for nullable types
+def get_dataset(self, name: str) -> Optional[DatasetInfo]:
+    pass
+```
+
+#### Documentation
+```python
+# Module-level docstring
+"""
+noeta_parser.py - Recursive descent parser for Noeta DSL.
+
+Implements syntax analysis and AST construction from token stream.
+"""
+
+# Class docstring
+class Parser:
+    """
+    Recursive descent parser for Noeta DSL.
+    
+    Converts token stream from lexer into Abstract Syntax Tree (AST).
+    Uses LL(1) grammar with single-token lookahead.
+    """
+
+# Method docstring
+def parse_filter(self):
+    """
+    Parse filter statement.
+    
+    Syntax: filter <source> condition=<expr> [and <expr>] as <alias>
+    
+    Returns:
+        FilterNode with source, conditions, and result alias
+    """
+```
+
+## Adding New Operations - Complete Checklist
+
+### Step 1: Add Token (noeta_lexer.py)
+
+```python
+# In TokenType enum
+class TokenType(Enum):
+    # ... existing tokens ...
+    MY_OPERATION = "MY_OPERATION"
+
+# In Lexer.__init__() keywords dictionary
+self.keywords = {
+    # ... existing keywords ...
+    'my_operation': TokenType.MY_OPERATION,
+}
+```
+
+### Step 2: Create AST Node (noeta_ast.py)
+
+```python
+@dataclass
+class MyOperationNode(ASTNode):
+    """Represents a my_operation statement."""
+    source_alias: str          # ⚠️ Use source_alias, NOT source!
+    new_alias: Optional[str]   # ⚠️ Use new_alias, NOT alias!
+    param1: Optional[str] = None
+    param2: Optional[int] = None
+```
+
+### Step 3: Add Parser Method (noeta_parser.py)
+
+```python
+def parse_my_operation(self):
+    """Parse: my_operation <source> [param1=<value>] as <alias>"""
+    self.expect(TokenType.MY_OPERATION)
+    
+    source_token = self.expect(TokenType.IDENTIFIER)
+    source = source_token.value
+    
+    # Parse optional parameters
+    param1 = None
+    if self.match(TokenType.PARAM1):
+        self.pos += 1
+        self.expect(TokenType.EQUALS)
+        param1 = self.parse_value()
+    
+    # Parse alias
+    alias = None
+    if self.match(TokenType.AS):
+        self.pos += 1
+        alias_token = self.expect(TokenType.IDENTIFIER)
+        alias = alias_token.value
+    
+    return MyOperationNode(source, alias, param1)
+
+# Add to parse_statement() dispatcher
+def parse_statement(self):
+    # ... existing cases ...
+    elif self.match(TokenType.MY_OPERATION):
+        return self.parse_my_operation()
+```
+
+### Step 4: Add Semantic Validator (noeta_semantic.py) ⭐ REQUIRED!
+
+```python
+def visit_MyOperationNode(self, node: MyOperationNode) -> None:
+    """Validate my_operation operation."""
+    # 1. Check source dataset exists
+    source_info = self._check_dataset_exists(node.source_alias, node)
+    
+    # 2. Validate column exists (if applicable)
+    if hasattr(node, 'column') and node.column:
+        self._check_column_exists(source_info, node.column, node)
+    
+    # 3. Check column type (if applicable)
+    if hasattr(node, 'column') and node.column:
+        self._check_column_type(
+            source_info, 
+            node.column, 
+            DataType.NUMERIC,  # or STRING, DATETIME, etc.
+            node
+        )
+    
+    # 4. Register result dataset (if creates new dataset)
+    if node.new_alias:
+        result_info = DatasetInfo(
+            name=node.new_alias,
+            columns=source_info.columns.copy(),  # or modified schema
+            source=f"my_operation from {node.source_alias}"
+        )
+        self.symbol_table.define(node.new_alias, result_info)
+```
+
+**WHY THIS IS CRITICAL**:
+- ✅ Catches undefined datasets at **compile-time** (not runtime)
+- ✅ Validates column references before execution
+- ✅ Provides helpful error messages with suggestions
+- ✅ Maintains symbol table for cross-operation validation
+
+### Step 5: Add Code Generator Visitor (noeta_codegen.py)
+
+```python
+def visit_MyOperationNode(self, node: MyOperationNode) -> None:
+    """Generate Pandas code for my_operation."""
+    # Get source variable
+    df_var = self.symbol_table.get(node.source_alias)
+    if not df_var:
+        raise ValueError(f"Unknown dataframe: {node.source_alias}")
+    
+    # Add necessary imports
+    self.imports.add('import numpy as np')  # if needed
+    
+    # Generate Pandas code
+    code = f"{df_var}.my_pandas_method("
+    if node.param1:
+        code += f"param1={repr(node.param1)}"
+    code += ")"
+    
+    # Handle alias
+    if node.new_alias:
+        new_var = f"df_{len(self.symbol_table)}"
+        self.code.append(f"{new_var} = {code}")
+        self.symbol_table[node.new_alias] = new_var
+        self.code.append(f"print(f'Applied my_operation to {node.source_alias}')")
+    else:
+        self.code.append(f"print({code})")
+```
+
+### Step 6: Add Tests
+
+```python
+# tests/test_my_operation.py
+import pytest
+from noeta_lexer import Lexer
+from noeta_parser import Parser
+from noeta_semantic import SemanticAnalyzer
+from noeta_codegen import CodeGenerator
+
+def test_my_operation_lexer():
+    """Test tokenization of my_operation."""
+    lexer = Lexer("my_operation data as result")
+    tokens = lexer.tokenize()
+    assert tokens[0].type == TokenType.MY_OPERATION
+
+def test_my_operation_parser():
+    """Test parsing of my_operation."""
+    lexer = Lexer("my_operation data as result")
+    parser = Parser(lexer.tokenize())
+    ast = parser.parse()
+    assert isinstance(ast[0], MyOperationNode)
+
+def test_my_operation_semantic():
+    """Test semantic validation."""
+    # Test undefined source error
+    source = """
+    my_operation undefined_data as result
+    """
+    lexer = Lexer(source)
+    parser = Parser(lexer.tokenize())
+    ast = parser.parse()
+    analyzer = SemanticAnalyzer()
+    
+    with pytest.raises(NoetaError) as exc:
+        analyzer.analyze(ast)
+    assert "undefined_data" in str(exc.value)
+
+def test_my_operation_codegen():
+    """Test code generation."""
+    source = """
+    load "data.csv" as data
+    my_operation data as result
+    """
+    # Full compilation test
+    lexer = Lexer(source)
+    parser = Parser(lexer.tokenize())
+    ast = parser.parse()
+    analyzer = SemanticAnalyzer()
+    analyzer.analyze(ast)
+    codegen = CodeGenerator()
+    python_code = codegen.generate(ast)
+    assert "my_pandas_method" in python_code
+```
+
+```noeta
+# examples/test_my_operation.noeta
+load csv "data/sales_data.csv" as sales
+my_operation sales param1="value" as result
+describe result
+```
+
+### Step 7: Update Documentation
+
+1. **STATUS.md** - Add to operation count and coverage
+2. **NOETA_COMMAND_REFERENCE.md** - Add syntax reference
+3. **DATA_MANIPULATION_REFERENCE.md** - Add detailed documentation
+
+### Step 8: Update setup.py (If New Module)
+
+```python
+# If you created a new module (e.g., noeta_myfeature.py)
+py_modules=[
+    'noeta_lexer',
+    'noeta_parser',
+    'noeta_ast',
+    'noeta_semantic',
+    'noeta_codegen',
+    'noeta_runner',
+    'noeta_kernel',
+    'noeta_errors',
+    'noeta_myfeature',  # <-- Add here!
+    'install_kernel',
+    'test_noeta'
+],
+```
+
+Then reinstall:
+```bash
+pip install -e . --force-reinstall --no-deps
+```
+
+## Error Handling Standards
+
+### Error Types
+```python
+from noeta_errors import NoetaError, ErrorCategory, ErrorContext
+
+# Lexer errors
+raise NoetaError(
+    message="Unterminated string",
+    category=ErrorCategory.LEXER,
+    context=ErrorContext(line=1, column=5, source_line='load "data.csv'),
+    hint="Add closing quote"
+)
+
+# Parser errors
+raise NoetaError(
+    message="Expected identifier after 'as'",
+    category=ErrorCategory.SYNTAX,
+    context=ErrorContext(line=2, column=10, source_line='select data as'),
+    suggestion="select data as mydata"
+)
+
+# Semantic errors
+raise NoetaError(
+    message=f"Undefined dataset: {name}",
+    category=ErrorCategory.SEMANTIC,
+    context=ErrorContext(line=node.line, column=node.column),
+    hint="Load the dataset first using 'load' operation"
+)
+```
+
+### Multi-Error Reporting
+```python
+# Collect all errors before raising
+errors = []
+for node in ast:
+    try:
+        self.validate(node)
+    except NoetaError as e:
+        errors.append(e)
+
+if errors:
+    if len(errors) == 1:
+        raise errors[0]
+    else:
+        raise create_multi_error(errors)
+```
+
+## Testing Standards
+
+### Test Organization
+```
+tests/
+├── test_lexer.py         # Token recognition
+├── test_parser.py        # Syntax analysis
+├── test_semantic.py      # Semantic validation
+├── test_codegen.py       # Code generation
+├── test_integration.py   # End-to-end tests
+├── test_errors.py        # Error handling
+└── conftest.py           # Shared fixtures
+```
+
+### Test Naming
+```python
+# Format: test_<component>_<scenario>
+def test_lexer_tokenize_filter():
+    """Test that filter keyword is tokenized correctly."""
+    pass
+
+def test_parser_filter_with_conditions():
+    """Test parsing filter with multiple conditions."""
+    pass
+
+def test_semantic_undefined_dataset():
+    """Test error on undefined dataset reference."""
+    pass
+
+def test_codegen_filter_generates_pandas():
+    """Test that filter generates correct Pandas code."""
+    pass
+```
+
+### Test Coverage Requirements
+- **Lexer**: 100% token type coverage
+- **Parser**: 100% operation coverage + error cases
+- **Semantic**: 100% validation rule coverage + error cases
+- **Codegen**: 100% visitor coverage + edge cases
+- **Integration**: Real-world workflows (examples/*.noeta)
+
+## Symbol Table Management
+
+### Dataset Tracking
+```python
+# In SemanticAnalyzer
+class DatasetInfo:
+    name: str
+    columns: Dict[str, ColumnInfo]  # Column name -> ColumnInfo
+    source: str                      # Where dataset came from
+
+# Register datasets
+self.symbol_table.define(alias, DatasetInfo(...))
+
+# Check existence
+info = self.symbol_table.lookup(alias)
+if not info:
+    self._error(f"Undefined dataset: {alias}")
+```
+
+### Variable Naming in Codegen
+```python
+# Generate unique variable names
+df_var = f"df_{len(self.symbol_table)}"
+self.code.append(f"{df_var} = pd.read_csv('{filepath}')")
+self.symbol_table[alias] = df_var
+```
+
+## Import Management
+
+### Dynamic Import Collection
+```python
+# In CodeGenerator.__init__
+self.imports = set()
+
+# In visitor methods, add imports as needed
+self.imports.add('import numpy as np')
+self.imports.add('from sklearn.preprocessing import StandardScaler')
+
+# In generate(), emit all imports first
+for imp in sorted(self.imports):
+    code_lines.append(imp)
+```
+
+### Standard Imports
+Always included:
+- `pandas as pd`
+- `numpy as np`
+- `matplotlib.pyplot as plt`
+- `seaborn as sns`
+
+## Column-Level Validation
+
+### Enable with --type-check Flag
+```bash
+python noeta_runner.py script.noeta --type-check
+```
+
+### File Introspection
+```python
+# In SemanticAnalyzer
+def _introspect_file_schema(self, filepath: str, format_type: str) -> Dict[str, ColumnInfo]:
+    """Read file header to get column schema."""
+    if not self.enable_type_check:
+        return {}  # Fast path - skip introspection
+    
+    # Read header only (very fast!)
+    if format_type == 'csv':
+        df = pd.read_csv(filepath, nrows=0)
+    elif format_type == 'parquet':
+        df = pd.read_parquet(filepath)
+    # ... other formats
+    
+    return {col: ColumnInfo(name=col, dtype=infer_type(df[col].dtype))
+            for col in df.columns}
+```
+
+### Column Validation (Permissive)
+```python
+# Only validate when schema is known
+if source_info and source_info.columns:
+    for col in node.columns:
+        if col not in source_info.columns:
+            self._error(f"Column '{col}' not found in {node.source_alias}")
+```
+
+## Documentation Standards
+
+### Module Documentation
+Every module must have:
+1. Module docstring with purpose
+2. Key classes/functions listed
+3. Usage examples
+
+### Function Documentation
+```python
+def parse_filter(self):
+    """
+    Parse filter statement.
+    
+    Syntax:
+        filter <source> condition=<expr> [and <expr>] as <alias>
+    
+    Args:
+        None (uses self.tokens and self.pos)
+    
+    Returns:
+        FilterNode: AST node representing filter operation
+    
+    Raises:
+        NoetaError: If syntax is invalid
+    
+    Example:
+        filter sales condition=(price > 100) as expensive
+    """
+    pass
+```
+
+### Operation Documentation (DATA_MANIPULATION_REFERENCE.md)
+Each operation needs:
+1. Purpose and description
+2. Syntax variations (3-5 examples)
+3. Parameters with types
+4. Return value description
+5. Pandas equivalent code
+6. Common use cases
+7. Related operations
+8. Notes and caveats
+
+## Performance Considerations
+
+### Lexer Optimizations
+- Use regex compilation (done once in `__init__`)
+- Single-pass tokenization
+- Efficient position tracking
+
+### Parser Optimizations
+- LL(1) grammar (no backtracking)
+- Single-token lookahead
+- Early error detection
+
+### Codegen Optimizations
+- Generate idiomatic Pandas (vectorized operations)
+- Avoid unnecessary copies
+- Use method chaining where appropriate
+
+## Common Pitfalls to Avoid
+
+### ❌ DON'T: Skip Semantic Validation
+```python
+# BAD - No semantic validation
+def visit_FilterNode(self, node):
+    # Generate code without checking if source exists
+    code = f"{node.source}.query(...)"
+```
+
+### ✅ DO: Validate Before Codegen
+```python
+# GOOD - Validate in semantic analyzer
+def visit_FilterNode(self, node):
+    source_info = self._check_dataset_exists(node.source_alias, node)
+    # Now safe to proceed
+```
+
+### ❌ DON'T: Use Generic Field Names
+```python
+# BAD - Confusing field names
+@dataclass
+class FilterNode(ASTNode):
+    source: str    # ❌ Ambiguous
+    alias: str     # ❌ Is this input or output?
+```
+
+### ✅ DO: Use Descriptive Field Names
+```python
+# GOOD - Clear field names
+@dataclass
+class FilterNode(ASTNode):
+    source_alias: str  # ✅ Clearly input dataset
+    new_alias: str     # ✅ Clearly output dataset
+```
+
+### ❌ DON'T: Hardcode Imports
+```python
+# BAD - Always imports sklearn even if not used
+def generate(self, ast):
+    code = ["from sklearn.preprocessing import StandardScaler"]
+```
+
+### ✅ DO: Collect Imports Dynamically
+```python
+# GOOD - Only import what's used
+def visit_StandardScaleNode(self, node):
+    self.imports.add('from sklearn.preprocessing import StandardScaler')
+```
+
+### ❌ DON'T: Generate Non-Idiomatic Pandas
+```python
+# BAD - Inefficient row-by-row iteration
+for i in range(len(df)):
+    df.loc[i, 'price'] = df.loc[i, 'price'] * 1.1
+```
+
+### ✅ DO: Generate Vectorized Pandas
+```python
+# GOOD - Vectorized operation
+df['price'] = df['price'] * 1.1
+```
+
+## Version Control
+
+### Commit Message Format
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types**: feat, fix, docs, style, refactor, test, chore
+
+**Examples**:
+```
+feat(parser): Add support for window functions
+
+Implemented row_number, rank, dense_rank, and lead/lag operations.
+Updated parser to handle OVER clauses and partition specifications.
+
+Closes #123
+```
+
+```
+fix(semantic): Validate column existence in join operations
+
+Added column validation for join keys in both left and right datasets.
+Provides helpful error messages when columns don't exist.
+
+Fixes #456
+```
+
+## Git Workflow
+
+### Branch Naming
+- `feature/<operation-name>` - New operations
+- `fix/<issue-description>` - Bug fixes
+- `docs/<documentation-update>` - Documentation
+- `refactor/<component-name>` - Code refactoring
+
+### Before Committing
+1. Run tests: `pytest tests/`
+2. Check linting: `pylint noeta_*.py`
+3. Update documentation if needed
+4. Add test cases for new features
+
+## IDE Configuration
+
+### VS Code Settings (Recommended)
+```json
+{
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.formatting.provider": "black",
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "editor.rulers": [88],
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.egg-info": true,
+    "build/": true
+  }
+}
+```
+
+## Quick Reference Commands
+
+```bash
+# Run script
+python noeta_runner.py examples/demo.noeta
+
+# Run with verbose output
+python noeta_runner.py examples/demo.noeta -v
+
+# Run with type checking
+python noeta_runner.py examples/demo.noeta --type-check
+
+# Run inline code
+python noeta_runner.py -c 'load "data.csv" as d; describe d'
+
+# Install Jupyter kernel
+python install_kernel.py
+
+# Run tests
+pytest tests/
+
+# Run specific test file
+pytest tests/test_parser.py
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+
+# Install package
+pip install -e .
+
+# Reinstall after changes
+pip install -e . --force-reinstall --no-deps
+```
+
+## Resources
+
+### Key Documentation Files
+- **CLAUDE.md** - Comprehensive development guide (this file's basis)
+- **STATUS.md** - Implementation status and roadmap
+- **FLOW_DIAGRAM.md** - Visual system architecture (10 Mermaid diagrams)
+- **DATA_MANIPULATION_REFERENCE.md** - Complete operation reference
+- **NOETA_COMMAND_REFERENCE.md** - Quick syntax reference
+
+### Example Files
+- `examples/test_*.noeta` - 20+ test scripts
+- `examples/test_comprehensive_all_phases.noeta` - Full integration test
+
+### Test Data
+- `data/*.csv` - Sample datasets for testing
+
+---
+
+**Last Updated**: December 19, 2025
+**Project Status**: ✅ Production Ready with Semantic Validation
+**Coverage**: 167/250 operations (67%)
+

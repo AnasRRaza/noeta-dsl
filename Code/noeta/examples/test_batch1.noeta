@@ -1,0 +1,26 @@
+# Test Batch 1: Core Selection & Filtering Operations
+
+load csv "data/sales_data.csv" as sales
+
+# Test 1: Select without alias (display mode)
+select sales with product_id, category, price
+
+# Test 2: Select with alias (storage mode)
+select sales with product_id, category, price as selected
+
+# Test 3: Filter without alias (display mode)
+filter sales where price > 100
+
+# Test 4: Filter with alias (storage mode)
+filter sales where price > 100 as expensive
+
+# Test 5: Sort without alias (display mode)
+sort sales by price DESC
+
+# Test 6: Sort with alias (storage mode)
+sort sales by price DESC as sorted_sales
+
+# Test 7: Show stored results
+show selected
+show expensive with n=5
+show sorted_sales with n=3

@@ -1,0 +1,109 @@
+# Example 1: Basic Workflow
+
+# Load and clean data
+load "data/sales_data.csv" as sales
+dropna sales columns: {price, quantity} as clean_sales
+
+# Transform
+select clean_sales {product_id, category, price, quantity} as products
+filter products [price > 50] as expensive
+mutate expensive {revenue: "price * quantity"} as with_revenue
+
+# Analyze
+groupby with_revenue by: {category} agg: {sum:revenue, count:product_id} as summary
+describe summary
+
+# Visualize
+boxplot expensive columns: {price}
+
+# Example 2: Financial Time Series Analysis
+
+load csv "data/stock_prices.csv" as stocks
+
+# Calculate daily returns
+pct_change stocks column close with periods=1 as daily_returns
+
+# Track maximum price reached
+cummax stocks column close as all_time_high
+
+# Shift for previous day comparison
+shift stocks column close with periods=1 as previous_close
+
+# Example 3: Sales Analytics
+
+load csv "data/sales.csv" as sales
+
+# Running total of revenue
+cumsum sales column revenue as cumulative_revenue
+
+# Extract business day patterns
+extract_dayofweek sales column order_date as weekday
+extract_quarter sales column order_date as quarter
+
+# Create age-based segments
+cut sales column customer_age bins=[0, 25, 45, 65, 100] labels=["Gen Z", "Millennial", "Gen X", "Boomer"] as generation
+
+# Example 4: Text Data Processing
+
+load csv "data/products.csv" as products
+
+# Extract product codes
+extract_regex products column description pattern="[A-Z]{3}-[0-9]{4}" as product_code
+
+# Clean product names
+title products column name as formatted_name
+lstrip products column name with chars=" #" as cleaned_name
+
+# Find keyword positions
+find products column description substring="premium" as premium_position
+
+# Example 5: ML Preprocessing Pipeline
+
+load csv "data/features.csv" as features
+
+# Robust scaling for features with outliers
+robust_scale features column age as features_scaled
+robust_scale features_scaled column income as features_ready
+
+# Target encoding for high-cardinality categorical
+target_encode features_ready column zipcode target="price" as features_encoded
+
+# Validate data quality
+assert_no_nulls features_encoded column price
+assert_range features_encoded column age min=0 max=120
+
+# Example 6: Hierarchical Data Analysis
+
+load csv "data/sales.csv" as sales
+
+# Create multi-level index for complex grouping
+set_multiindex sales columns ["region", "category", "product"] as hierarchical_sales
+
+# Analyze at different levels
+# (can use .loc with tuples to access different levels)
+
+# Example 7: Data Quality Validation
+
+load csv "data/clean_data.csv" as data
+
+# Validation suite
+assert_unique data column customer_id
+assert_no_nulls data column email
+assert_range data column age min=18 max=100
+assert_range data column score min=0 max=100
+
+# If all assertions pass, data is ready
+save data as "data/validated_data.csv"
+
+# Example 8: Boolean Analysis
+
+load csv "data/survey.csv" as survey
+
+# Create boolean columns
+mutate survey with is_satisfied = rating >= 4 as survey_flags
+mutate survey_flags with is_promoter = rating >= 9 as survey_complete
+
+# Analyze boolean patterns
+any survey_complete column is_satisfied
+all survey_complete column is_satisfied
+count_true survey_complete column is_promoter

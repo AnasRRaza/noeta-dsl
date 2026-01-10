@@ -1,0 +1,64 @@
+# Test Batch 4: Basic Transformations (MutateNode, ApplyNode, RoundNode, UpperNode, LowerNode)
+
+load csv "data/sales_data.csv" as sales
+
+# ============================================================
+# TEST 1: RoundNode - Without alias (display mode)
+# ============================================================
+round sales column price decimals=0
+
+# ============================================================
+# TEST 2: RoundNode - With alias (storage mode)
+# ============================================================
+round sales column price decimals=0 as rounded_prices
+
+# ============================================================
+# TEST 3: UpperNode - Without alias (display mode)
+# ============================================================
+upper sales column category
+
+# ============================================================
+# TEST 4: UpperNode - With alias (storage mode)
+# ============================================================
+upper sales column category as upper_category
+
+# ============================================================
+# TEST 5: LowerNode - Without alias (display mode)
+# ============================================================
+lower sales column category
+
+# ============================================================
+# TEST 6: LowerNode - With alias (storage mode)
+# ============================================================
+lower sales column category as lower_category
+
+# ============================================================
+# TEST 7: MutateNode - Without alias (display mode)
+# ============================================================
+# Note: Mutate creates new columns, testing if display works
+# mutate sales with total = price * quantity
+
+# ============================================================
+# TEST 8: MutateNode - With alias (storage mode)
+# ============================================================
+# mutate sales with total = price * quantity as with_total
+
+# ============================================================
+# TEST 9: ApplyNode - Without alias (display mode)
+# ============================================================
+# Note: Apply transforms columns
+# apply sales columns {price} function "x * 1.1"
+
+# ============================================================
+# TEST 10: ApplyNode - With alias (storage mode)
+# ============================================================
+# apply sales columns {price} function "x * 1.1" as price_increased
+
+# ============================================================
+# TEST 11: Show stored results
+# ============================================================
+show rounded_prices with n=3
+show upper_category with n=3
+show lower_category with n=3
+# show with_total with n=3
+# show price_increased with n=3

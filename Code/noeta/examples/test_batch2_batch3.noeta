@@ -1,0 +1,74 @@
+# Test Batches 2 & 3: Aggregation, Joining, and Data Cleaning Operations
+
+load csv "data/sales_data.csv" as sales
+
+# ============================================================
+# BATCH 2: Aggregation & Joining Operations
+# ============================================================
+
+# Test 1: GroupBy without alias (display mode)
+groupby sales by category agg {mean: price, sum: quantity}
+
+# Test 2: GroupBy with alias (storage mode)
+groupby sales by category agg {mean: price, sum: quantity} as category_summary
+
+# Test 3: Show stored groupby result
+show category_summary
+
+# Test 4: Join without alias (display mode) - need two datasets
+filter sales where price > 100 as expensive_items
+filter sales where quantity > 5 as high_quantity
+join expensive_items with high_quantity on product_id
+
+# Test 5: Join with alias (storage mode)
+join expensive_items with high_quantity on product_id as joined_data
+
+# Test 6: Show joined result
+show joined_data with n=5
+
+# Test 7: Merge without alias (display mode)
+merge expensive_items with high_quantity on="product_id" how="inner"
+
+# Test 8: Merge with alias (storage mode)
+merge expensive_items with high_quantity on="product_id" how="inner" as merged_data
+
+# ============================================================
+# BATCH 3: Data Cleaning Operations
+# ============================================================
+
+# Test 9: DropNA without alias (display mode)
+dropna sales
+
+# Test 10: DropNA with alias (storage mode)
+dropna sales as clean_sales
+
+# Test 11: FillNA without alias - simple value (display mode)
+fillna sales column quantity with value=0
+
+# Test 12: FillNA with alias - simple value (storage mode)
+fillna sales column quantity with value=0 as filled_quantity
+
+# Test 13: FillNA with mean (display mode)
+fillna sales column price with method=mean
+
+# Test 14: FillNA with mean (storage mode)
+fillna sales column price with method=mean as filled_price
+
+# Test 15: DropDuplicates without alias (display mode)
+drop_duplicates sales
+
+# Test 16: DropDuplicates with alias (storage mode)
+drop_duplicates sales as unique_sales
+
+# Test 17: FillForward without alias - all columns (display mode)
+fill_forward sales
+
+# Test 18: FillForward with alias - specific column (storage mode)
+fill_forward sales column price as forward_filled
+
+# Test 19: Show all stored results
+show clean_sales with n=3
+show filled_quantity with n=3
+show filled_price with n=3
+show unique_sales with n=3
+show forward_filled with n=3

@@ -1,0 +1,139 @@
+# ============================================================
+# Test Batch 6 Phase 1: Math, Cumulative, and Time Series Operations
+# ============================================================
+# Tests 13 operations with optional alias support:
+#   - Math Operations (6): abs, sqrt, power, log, ceil, floor
+#   - Cumulative Operations (4): cumsum, cummax, cummin, cumprod
+#   - Time Series Operations (3): pct_change, diff, shift
+# ============================================================
+
+load csv "data/sales_data.csv" as sales
+
+# ============================================================
+# MATH OPERATIONS (6 operations)
+# ============================================================
+
+# Test 1: AbsNode - Without alias (display mode)
+abs sales column discount
+
+# Test 2: AbsNode - With alias (storage mode)
+abs sales column discount as abs_discount
+
+# Test 3: SqrtNode - Without alias (display mode)
+sqrt sales column quantity
+
+# Test 4: SqrtNode - With alias (storage mode)
+sqrt sales column quantity as sqrt_quantity
+
+# Test 5: PowerNode - Without alias (display mode)
+power sales column quantity exponent=2
+
+# Test 6: PowerNode - With alias (storage mode)
+power sales column quantity exponent=2 as quantity_squared
+
+# Test 7: LogNode - Without alias (display mode, natural log)
+log sales column price base=e
+
+# Test 8: LogNode - With alias (storage mode, base 10)
+log sales column price base=10 as log_price
+
+# Test 9: CeilNode - Without alias (display mode)
+ceil sales column price
+
+# Test 10: CeilNode - With alias (storage mode)
+ceil sales column price as ceil_price
+
+# Test 11: FloorNode - Without alias (display mode)
+floor sales column price
+
+# Test 12: FloorNode - With alias (storage mode)
+floor sales column price as floor_price
+
+# ============================================================
+# CUMULATIVE OPERATIONS (4 operations)
+# ============================================================
+
+# Test 13: CumSumNode - Without alias (display mode)
+cumsum sales column quantity
+
+# Test 14: CumSumNode - With alias (storage mode)
+cumsum sales column quantity as cumsum_quantity
+
+# Test 15: CumMaxNode - Without alias (display mode)
+cummax sales column price
+
+# Test 16: CumMaxNode - With alias (storage mode)
+cummax sales column price as cummax_price
+
+# Test 17: CumMinNode - Without alias (display mode)
+cummin sales column price
+
+# Test 18: CumMinNode - With alias (storage mode)
+cummin sales column price as cummin_price
+
+# Test 19: CumProdNode - Without alias (display mode)
+cumprod sales column quantity
+
+# Test 20: CumProdNode - With alias (storage mode)
+cumprod sales column quantity as cumprod_quantity
+
+# ============================================================
+# TIME SERIES OPERATIONS (3 operations)
+# ============================================================
+
+# Test 21: PctChangeNode - Without alias (display mode)
+pct_change sales column price with periods=1
+
+# Test 22: PctChangeNode - With alias (storage mode)
+pct_change sales column price with periods=1 as pct_change_price
+
+# Test 23: DiffNode - Without alias (display mode)
+diff sales column price with periods=1
+
+# Test 24: DiffNode - With alias (storage mode)
+diff sales column price with periods=1 as diff_price
+
+# Test 25: ShiftNode - Without alias (display mode)
+shift sales column price with periods=1
+
+# Test 26: ShiftNode - With alias (storage mode)
+shift sales column price with periods=1 as shifted_price
+
+# ============================================================
+# SHOW STORED RESULTS (verify storage mode worked)
+# ============================================================
+
+# Show Math operation results
+show abs_discount with n=3
+show sqrt_quantity with n=3
+show quantity_squared with n=3
+show log_price with n=3
+show ceil_price with n=3
+show floor_price with n=3
+
+# Show Cumulative operation results
+show cumsum_quantity with n=3
+show cummax_price with n=3
+show cummin_price with n=3
+show cumprod_quantity with n=3
+
+# Show Time Series operation results
+show pct_change_price with n=3
+show diff_price with n=3
+show shifted_price with n=3
+
+# ============================================================
+# SUMMARY
+# ============================================================
+# All 13 Phase 1 operations tested:
+#   ✅ 6 Math operations
+#   ✅ 4 Cumulative operations
+#   ✅ 3 Time Series operations
+#
+# Each operation tested:
+#   - Without alias (display mode) - 13 tests
+#   - With alias (storage mode) - 13 tests
+#   - Show stored results - 13 tests
+#
+# Total: 39 test cases
+# ============================================================
