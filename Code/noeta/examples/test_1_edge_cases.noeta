@@ -3,7 +3,7 @@
 # ============================================
 
 # EMPTY DATASET
-load "data/empty_dataset.csv" as empty
+load "/Users/ibrahimali/Library/Mobile Documents/com~apple~CloudDocs/Library/BSCS/IU/SEM 7 (F25)/FYP II/A/PRJ/Noeta/Code/noeta/data/empty_dataset.csv" as empty
 info empty
 describe empty
 
